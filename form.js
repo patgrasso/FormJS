@@ -31,21 +31,17 @@ function Form(canvas) {
         render: this.render,
         push: this.push
     }
-        
 }
 
 // TextBox : FormElement
-function TextBox(name, width, height) {
+function TextBox(name, _height, _width) {
 	this.value = "";
 	this.name = name;
-    this.width = width;
-    this.height = height;
-    
-    if (height === null || typeof(height) == "undefined") {
-        this.width = 200;
-		this.height = 25;
-    }
-    
+    this.width = _width;
+    this.height = _height;
+    if (_width === undefined) this.width = 200;
+    if (_height === undefined) this.height = 25;
+    console.log(this.width);
     /**
      * Renders the textbox at (x, y) on ctx
      * Returns the height so that the form renderer can place
@@ -59,6 +55,8 @@ function TextBox(name, width, height) {
 	}
 	
 	return {
+        width: this.width,
+        height: this.height,
         value: this.value,
         name: this.name,
         render: this.render
