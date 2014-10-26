@@ -1,70 +1,69 @@
 function Form(canvas) {
-	this.canvas = canvas;
-	this.ctx = canvas.getContext("2d");
-	this.ctx.fillStyle = "#000";
-	this.formElements = [];
+	var canvas = canvas;
+	var ctx = canvas.getContext("2d");
+	var formElements = [];
+    var padding = parseInt(ctx.font) + 8;
+
+    ctx.fillStyle = "#000";
 	
 	this.clear = function() {
 		ctx.clearRect(0, 0, canvas.width, canvas.height);	
 	}
 	
+    /**
+     * Renders all form elements on the canvas starting at position (x, y)
+     */
 	this.render = function(x, y) {
 		if (y === null) y = 0;
 		for (var i = 0; i < formElements.length; i++) {
 			y += formElements[i].render(ctx, x, y);
+            y += padding;
 		}
 	}
 	
     /**
      * Adds an element to the form
      */
-	this.push = function(formElement) {
+	this.add = function(formElement) {
 		formElements.push(formElement);
-        console.log(formElements);
 	}
-	
-	return {
-        canvas: this.canvas,
-        ctx: this.ctx,
-        formElements: this.formElements,
-        clear: this.clear,
-        render: this.render,
-        push: this.push
-    }
+
+    /**
+     * Add a click event listener to select form
+     */
+    canvas.addEventListener('click', function(event) {
+        console.log({x: event.x, y: event.y});
+        ctx.fillRect(event.x, event.y, 1, 1);
+    });
+
+    this.formElements = formElements;
 }
 
 // TextBox : FormElement
-function TextBox(name, _height, _width) {
-	this.value = "";
-	this.name = name;
-    this.width = _width;
-    this.height = _height;
-    if (_width === undefined) this.width = 200;
-    if (_height === undefined) this.height = 25;
-    console.log(this.width);
+function TextBox(name, height, width) {
+	var value = "";
+	var name = name;
+    var width = width || 200;
+    var height = height || 25;
+    console.log(width);
     /**
      * Renders the textbox at (x, y) on ctx
      * Returns the height so that the form renderer can place
      * the next element at an appropriate height
      */
 	this.render = function(ctx, x, y) {
+        ctx.strokeText(name, x, y);
+        y += 4;
 		ctx.strokeRect(x, y, width, height);
-        ctx.clearRect(x+1, y+1, width-1, height-1);
-        // ^ this is needed to correct the unwanted border effect
 		return height;
 	}
-	
-	return {
-        width: this.width,
-        height: this.height,
-        value: this.value,
-        name: this.name,
-        render: this.render
-    }
 }
 
 function initializeCanvas() {
-	var fm = Form(document.getElementById("canvas"));
-    fm.push(TextBox("name"));
-    fm.render(0, 0);
+	var fm = new Form(document.getElementById("canvas"));
+    fm.add(new TextBox("name"));
+    fm.add(new TextBox("year"));
+    fm.add(new TextBox("age", 25, 25));
+    fm.render(10, 10);
+    console.log(fm.formElements);
 }
