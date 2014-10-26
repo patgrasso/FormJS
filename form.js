@@ -1,8 +1,7 @@
 function Form(canvas) {
 	this.canvas = canvas;
 	this.ctx = canvas.getContext("2d");
-	this.ctx.fillStyle = "#FF0000";
-	this.ctx.fillRect(0,0,150,75);
+	this.ctx.fillStyle = "#000";
 	this.formElements = [];
 	
 	this.clear = function() {
@@ -12,38 +11,62 @@ function Form(canvas) {
 	this.render = function(x, y) {
 		if (y === null) y = 0;
 		for (var i = 0; i < formElements.length; i++) {
-			y += formElements[i].render(x, y);
+			y += formElements[i].render(ctx, x, y);
 		}
 	}
 	
-	this.append = function(formElement) {
+    /**
+     * Adds an element to the form
+     */
+	this.push = function(formElement) {
 		formElements.push(formElement);
         console.log(formElements);
 	}
 	
-	return this;
+	return {
+        canvas: this.canvas,
+        ctx: this.ctx,
+        formElements: this.formElements,
+        clear: this.clear,
+        render: this.render,
+        push: this.push
+    }
+        
 }
 
-// TextBox object
-function TextBox(ctx, name) {
-	this.ctx = ctx;
+// TextBox : FormElement
+function TextBox(name, width, height) {
 	this.value = "";
 	this.name = name;
-	
-	this.render = function(x, y, width, height) {
-		if (width === null && height === null) {
-			width = 100;
-			height = 25;
-		}
-		ctx.rect(x, y, width, height);
+    this.width = width;
+    this.height = height;
+    
+    if (height === null || typeof(height) == "undefined") {
+        this.width = 200;
+		this.height = 25;
+    }
+    
+    /**
+     * Renders the textbox at (x, y) on ctx
+     * Returns the height so that the form renderer can place
+     * the next element at an appropriate height
+     */
+	this.render = function(ctx, x, y) {
+		ctx.strokeRect(x, y, width, height);
+        ctx.clearRect(x+1, y+1, width-1, height-1);
+        // ^ this is needed to correct the unwanted border effect
 		return height;
 	}
 	
-	return this;
+	return {
+        value: this.value,
+        name: this.name,
+        render: this.render
+    }
 }
 
 function initializeCanvas() {
 	var fm = Form(document.getElementById("canvas"));
-    fm.append(TextBox(fm.ctx, "name"));
-    fm.render();
+    fm.push(TextBox("name"));
+    fm.render(0, 0);
 }
