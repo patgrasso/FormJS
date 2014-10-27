@@ -1,7 +1,9 @@
-
 /*global document*/
 /*global console*/
 /*global DEBUG*/
+
+var DEBUG = 1;
+
 /**
  * A form that is drawn to an HTML canvas that has input listeners to
  * make it act like a real form. It is useful for canvas games which
@@ -78,24 +80,33 @@ function Form(canvas) {
      * Add a keydown event listener to type text
      */
     document.addEventListener('keydown', function (event) {
-        //TODO: Map all 'keyCodes' to appropriate functionalities
-        var elem;
-            //deleteCharacterCode = 127;
         if (selectedIndex !== null) {
-            elem = formElements[selectedIndex];
-
-            if (event.keyCode === 8) {
-                elem.value = elem.value.substr(0, elem.value.length - 1);
-            } else if (event.keyCode > 64 && event.keyCode < 91) {
-                elem.value += String.fromCharCode((!event.shiftKey) * 32 + event.keyCode);
-            }// else if (event.keyCode === deleteCharacterCode)
-            elem.render();
+            // If the key was TAB (kc: 9), select next form element
+            if (event.keyCode === 9) {
+                selectFormElement((selectedIndex + 1) % formElements.length);
+                event.preventDefault();
+            }
+            if (!event.shiftKey) {
+                formElements[selectedIndex].handleInput(event.keyCode);
+            } else {
+                formElements[selectedIndex].handleShiftedInput(event.keyCode);
+            }
+            formElements[selectedIndex].render();
         }
 
         if (DEBUG) {
             console.log(event);
+            console.log({
+                charCode: event.charCode,
+                keyCode: event.keyCode,
+                chr: String.fromCharCode(event.keyCode)
+            });
         }
-    }, true);
+    }, false);
+
+    this.setFont = function (font) {
+        ctx.font = font;
+    }
 
     this.formElements = formElements;
 }
@@ -111,7 +122,8 @@ function TextBox(name, height, width) {
 
     var selected = false,
         ctx,
-        fontHeight;
+        fontHeight,
+        cursorIndex = 0;
 
     this.value = "";
     this.name = name;
@@ -151,7 +163,7 @@ function TextBox(name, height, width) {
 
         // Draw cursor
         if (selected) {
-            ctx.fillRect(x + ctx.measureText(this.value).width + 4, y + 2, 2, this.height - 4);
+            ctx.fillRect(x + ctx.measureText(this.value.slice(0, cursorIndex)).width + 1, y + 2, 2, this.height - 4);
         }
 
         return this.height;
@@ -171,15 +183,72 @@ function TextBox(name, height, width) {
         ctx = context;
         fontHeight = parseInt(ctx.font, 10);
     };
+
+    this.handleInput = function (keyCode) {
+        var keymap = {
+            32: ' ',
+            187: '=', 188: ',', 189: '-',
+            190: '.', 191: '/', 192: '`',
+            219: '[', 220: '\\', 221: ']',
+            222: "'", 186: ';'
+        };
+        if (keyCode >= 65 && keyCode <= 90) {
+            this.input(String.fromCharCode(keyCode + 32));
+        }
+        if (keyCode >= 48 && keyCode <= 57) {
+            this.input(String.fromCharCode(keyCode))
+        }
+        if (keyCode === 46) {
+            this.value = this.value.slice(0, cursorIndex) + this.value.slice(cursorIndex+1);
+        }
+        if (keyCode === 8) {
+            this.value = this.value.slice(0, cursorIndex-1) + this.value.slice(cursorIndex);
+            cursorIndex -= (cursorIndex <= 0) ? 0 : 1;
+        }
+        if (keyCode === 37) {
+            cursorIndex -= 1;
+        }
+        if (keyCode === 39) {
+            cursorIndex += 1;
+        }
+        if (keyCode in keymap) {
+            this.input(keymap[keyCode]);
+        }
+    };
+
+    this.handleShiftedInput = function (keyCode) {
+        var keymap = {
+            32: ' ', 48: '!', 49: '@',
+            50: '#', 51: '$', 52: '%',
+            53: '^', 54: '&', 55: '*',
+            56: '(', 58: ')',
+            187: '+', 188: '<', 189: '_',
+            190: '>', 191: '?', 192: '~',
+            219: '{', 220: '|', 221: '}',
+            222: '"', 186: ':'
+        };
+        if (keyCode >= 65 && keyCode <= 90) {
+            this.input(String.fromCharCode(keyCode));
+        } else if (keyCode in keymap) {
+            this.input(keymap[keyCode]);
+        } else {
+            this.handleInput(keyCode);
+        }
+    };
+
+    this.input = function (character) {
+        this.value = this.value.slice(0, cursorIndex) + character + this.value.slice(cursorIndex);
+        cursorIndex += 1;
+    }
 }
 
 function initializeCanvas() {
     "use strict";
 
     var fm = new Form(document.getElementById("canvas"));
+    fm.setFont("14px sans-serif");
     fm.add(new TextBox("name"));
     fm.add(new TextBox("year"));
     fm.add(new TextBox("age", 25, 25));
     fm.render(10, 10);
-    console.log(fm.formElements);
 }
