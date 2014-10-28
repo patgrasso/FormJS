@@ -1,6 +1,6 @@
 /*global document*/
 /*global console*/
-/*global DEBUG*/
+/*global DEBUG: true*/
 
 var DEBUG = 1;
 
@@ -12,6 +12,8 @@ var DEBUG = 1;
 function Form(canvas) {
     "use strict";
 
+    // Check to make sure Form is instantiated and not just called like a
+    // regular function
     if (!(this instanceof Form)) {
         throw new Error("Constructor called as a function.");
     }
@@ -26,6 +28,9 @@ function Form(canvas) {
 
     ctx.fillStyle = "#000";
 
+    /**
+     * Erases the rendered form by clearing the entire canvas
+     */
     this.clear = function () {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     };
@@ -44,6 +49,10 @@ function Form(canvas) {
         }
     };
 
+    /**
+     * Selects the form element at [index]. The form element's select()
+     * method is called so that it can render/handle further actions
+     */
     function selectFormElement(index) {
         var i;
         selectedIndex = index;
@@ -62,7 +71,11 @@ function Form(canvas) {
     };
 
     /**
-     * Add a click event listener to select form
+     * Add a click event listener to handle clicking (this could mean selecting
+     * a form element, or choosing from a dropdown, etc.)
+     * 
+     * TODO: Dispatch click to form element, so it may interpret the click on
+     *       its own
      */
     canvas.addEventListener('click', function (event) {
         var i;
@@ -77,13 +90,19 @@ function Form(canvas) {
     }, false);
 
     /**
-     * Add a keydown event listener to type text
+     * Add a keydown event listener for keyboard input. The entered keycode is
+     * dispatched to either a form element's handleInput() or handleShiftedInput()
+     * method, depending on whether the SHIFT key was pressed during input
      */
     document.addEventListener('keydown', function (event) {
         if (selectedIndex !== null) {
             // If the key was TAB (kc: 9), select next form element
             if (event.keyCode === 9) {
-                selectFormElement((selectedIndex + 1) % formElements.length);
+                selectFormElement((selectedIndex + (event.shiftKey ? formElements.length - 1 : 1)) % formElements.length);
+                event.preventDefault();
+            }
+            // If the key was SPACE (kc: 32), prevent default behaviour
+            if (event.keyCode === 32) {
                 event.preventDefault();
             }
             if (!event.shiftKey) {
@@ -104,9 +123,15 @@ function Form(canvas) {
         }
     }, false);
 
+    /**
+     * Sets the canvas context's font. Accepts the form:
+     *      [font-size] [font-style]
+     * e.g.       "14px sans-serif"
+     * as a string
+     */
     this.setFont = function (font) {
         ctx.font = font;
-    }
+    };
 
     this.formElements = formElements;
 }
@@ -133,7 +158,9 @@ function TextBox(name, height, width) {
     this.y = 0;
 
 
-
+    /**
+     * Clears the entire TextBox
+     */
     this.clear = function () {
         ctx.clearRect(this.x, this.y, this.width, this.height + parseInt(ctx.font, 10) + 4);
     };
@@ -152,57 +179,96 @@ function TextBox(name, height, width) {
         this.clear();
 
         // Draw TextBox name
-        ctx.strokeText(name, x, y + fontHeight);
+        ctx.fillText(name, x, y + fontHeight);
         y += fontHeight + 4;
 
         // Draw TextBox
         ctx.strokeRect(x, y, this.width, this.height);
 
         // Draw value
-        ctx.strokeText(this.value, x + 2, y + (this.height + fontHeight) / 2 - 2);
+        ctx.fillText(this.value, x + 2, y + (this.height + fontHeight) / 2 - 2);
 
         // Draw cursor
         if (selected) {
             ctx.fillRect(x + ctx.measureText(this.value.slice(0, cursorIndex)).width + 1, y + 2, 2, this.height - 4);
         }
 
-        return this.height;
+        return this.height + fontHeight;
     };
 
+    /**
+     * De-selects the TextBox. "Unfocuses" the element
+     */
     this.unselect = function () {
         selected = false;
         this.render();
     };
 
+    /**
+     * Selects the TextBox. "Focuses" the element
+     */
     this.select = function () {
         selected = true;
         this.render();
     };
 
+    /**
+     * Should be used primarily by a Form object to set the canvas on which
+     * drawing should occur (but note that it takes the canvas context, not
+     * the actual canvas itself)
+     *
+     * TODO: Make this so that ONLY the Form object can access it
+     */
     this.setContext = function (context) {
         ctx = context;
         fontHeight = parseInt(ctx.font, 10);
     };
 
+    /**
+     * Handles normal (non-shifted) user input. Special rules apply to various
+     * ranges of key codes:
+     *
+     *      65-90 : Lowercase letters
+     *      48-57 : Numbers
+     *      97-105: Keypad numbers (treated as normal numbers)
+     *      46    : Delete the letter in front of the cursor
+     *      8     : Backspace (delete) the letter behind the cursor
+     *      37/39 : Arrowkeys -- adjusts the cursor position
+     *
+     * Any input that is not recognized by any of these conditions might be
+     * picked up in the [keymap] object and translated (keyboard input needs
+     * to be power-washed clean in JS)
+     */
     this.handleInput = function (keyCode) {
         var keymap = {
-            32: ' ',
-            187: '=', 188: ',', 189: '-',
-            190: '.', 191: '/', 192: '`',
-            219: '[', 220: '\\', 221: ']',
-            222: "'", 186: ';'
-        };
+                32: ' ',
+                96: '0',
+                187: '=',
+                188: ',',
+                189: '-',
+                190: '.',
+                191: '/',
+                192: '`',
+                219: '[',
+                220: '\\',
+                221: ']',
+                222: "'",
+                186: ';'
+            };
         if (keyCode >= 65 && keyCode <= 90) {
             this.input(String.fromCharCode(keyCode + 32));
         }
         if (keyCode >= 48 && keyCode <= 57) {
-            this.input(String.fromCharCode(keyCode))
+            this.input(String.fromCharCode(keyCode));
+        }
+        if (keyCode >= 97 && keyCode <= 105) {
+            this.input(String.fromCharCode(keyCode - 48));
         }
         if (keyCode === 46) {
-            this.value = this.value.slice(0, cursorIndex) + this.value.slice(cursorIndex+1);
+            this.value = this.value.slice(0, cursorIndex) + this.value.slice(cursorIndex + 1);
         }
         if (keyCode === 8) {
-            this.value = this.value.slice(0, cursorIndex-1) + this.value.slice(cursorIndex);
+            this.value = this.value.slice(0, cursorIndex - 1) + this.value.slice(cursorIndex);
             cursorIndex -= (cursorIndex <= 0) ? 0 : 1;
         }
         if (keyCode === 37) {
@@ -211,42 +277,70 @@ function TextBox(name, height, width) {
         if (keyCode === 39) {
             cursorIndex += 1;
         }
-        if (keyCode in keymap) {
+        if (keymap[keyCode] !== undefined) {
             this.input(keymap[keyCode]);
         }
     };
 
+    /**
+     * See handleInput() for explanation of input handling. The only difference
+     * for shifted input is the keymap for symbols and capitalization of letters.
+     * If not either of these cases, the default handleInput() method is called
+     * for the keyCode
+     */
     this.handleShiftedInput = function (keyCode) {
         var keymap = {
-            32: ' ', 48: '!', 49: '@',
-            50: '#', 51: '$', 52: '%',
-            53: '^', 54: '&', 55: '*',
-            56: '(', 58: ')',
-            187: '+', 188: '<', 189: '_',
-            190: '>', 191: '?', 192: '~',
-            219: '{', 220: '|', 221: '}',
-            222: '"', 186: ':'
-        };
+                32: ' ',
+                49: '!',
+                50: '@',
+                51: '#',
+                52: '$',
+                53: '%',
+                54: '^',
+                55: '&',
+                56: '*',
+                57: '(',
+                58: ')',
+                187: '+',
+                188: '<',
+                189: '_',
+                190: '>',
+                191: '?',
+                192: '~',
+                219: '{',
+                220: '|',
+                221: '}',
+                222: '"',
+                186: ':'
+            };
         if (keyCode >= 65 && keyCode <= 90) {
             this.input(String.fromCharCode(keyCode));
-        } else if (keyCode in keymap) {
+        } else if (keymap[keyCode] !== undefined) {
             this.input(keymap[keyCode]);
         } else {
             this.handleInput(keyCode);
         }
     };
 
+    /**
+     * Inserts one character at the position of the cursor, the value stored in this.value
+     */
     this.input = function (character) {
         this.value = this.value.slice(0, cursorIndex) + character + this.value.slice(cursorIndex);
         cursorIndex += 1;
-    }
+    };
 }
 
+
+
+/**
+ * Initialize the canvas, Form, and TextBoxes to populate the form
+ */
 function initializeCanvas() {
     "use strict";
 
     var fm = new Form(document.getElementById("canvas"));
-    fm.setFont("14px sans-serif");
+    fm.setFont("18px sans-serif");
     fm.add(new TextBox("name"));
     fm.add(new TextBox("year"));
     fm.add(new TextBox("age", 25, 25));
